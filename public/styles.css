@@ -1,0 +1,252 @@
+:root {
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --danger: #b91c1c;
+  --shadow: 0 10px 25px rgba(0,0,0,.06);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.92);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(8px);
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 12px;
+}
+
+.container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+}
+
+.narrow {
+  max-width: 620px;
+  margin: 50px auto;
+}
+
+h1 { margin-top: 0; font-size: 26px; }
+h2 { margin-top: 0; font-size: 19px; }
+p { line-height: 1.65; }
+
+.muted { color: var(--muted); }
+.danger { color: var(--danger); }
+
+label {
+  display: block;
+  margin: 14px 0 8px;
+  font-weight: 600;
+}
+
+input, select, textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 12px;
+  font-size: 15px;
+  outline: none;
+  background: #fff;
+}
+
+textarea { min-height: 92px; resize: vertical; }
+textarea.big { min-height: 220px; }
+
+button {
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 16px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+button.primary {
+  background: var(--primary);
+  color: white;
+}
+
+button.primary:hover { background: var(--primary-dark); }
+
+button.secondary, button.choice {
+  background: #eef2ff;
+  color: #1e3a8a;
+}
+
+button.choice.selected {
+  background: #16a34a;
+  color: #fff;
+}
+
+.actions, .bottom-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.checkbox {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.checkbox input { width: auto; }
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.task-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 18px;
+  align-items: start;
+}
+
+.sticky-note {
+  border-left: 5px solid var(--primary);
+}
+
+.aoi {
+  scroll-margin-top: 72px;
+}
+
+.chat-panel {
+  position: sticky;
+  top: 76px;
+  max-height: calc(100vh - 95px);
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  min-height: 240px;
+  max-height: 45vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.msg {
+  padding: 10px 12px;
+  border-radius: 14px;
+  margin-bottom: 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.msg.user {
+  background: #dbeafe;
+  margin-left: 30px;
+}
+
+.msg.assistant {
+  background: #f3f4f6;
+  margin-right: 30px;
+}
+
+.chat-input-row {
+  display: grid;
+  grid-template-columns: 1fr 76px;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chat-tools {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.choice-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.checks label {
+  font-weight: 400;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.checks input { width: auto; }
+
+.scale-row {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  margin: 12px 0;
+}
+
+.scale-options {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.scale-options label {
+  margin: 0;
+  font-weight: 400;
+}
+
+.scale-options input {
+  width: auto;
+}
+
+@media (max-width: 900px) {
+  .task-layout, .grid2 {
+    grid-template-columns: 1fr;
+  }
+  .chat-panel {
+    position: relative;
+    top: 0;
+    max-height: none;
+  }
+}

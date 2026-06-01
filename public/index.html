@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI用户注意力在线实验系统</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <strong>AI用户注意力在线实验系统</strong>
+      <span id="sessionBadge" class="badge">未登录</span>
+    </div>
+    <div class="progress"><span id="progressText">Step 0 / 8</span></div>
+  </header>
+
+  <main id="app" class="container">
+    <section id="screen-login" class="screen active">
+      <div class="card narrow">
+        <h1>实验登录</h1>
+        <p class="muted">本系统默认使用匿名被试ID。请输入实验邀请码；没有邀请码也可直接进入测试。</p>
+        <label>实验邀请码 / Login Code</label>
+        <input id="loginCode" placeholder="例如：EXP2026-A01" />
+        <button id="btnLogin" class="primary">进入实验</button>
+      </div>
+    </section>
+
+    <section id="screen-consent" class="screen">
+      <div class="card">
+        <h1>知情同意</h1>
+        <p>本实验用于研究AI产品体验过程中的用户注意力。系统会记录你在页面中的点击、停留、滚动、AI交互内容、问卷答案和任务后开放评价。</p>
+        <p class="danger">请勿在对话或开放评价中填写姓名、手机号、身份证号、住址等敏感个人信息。</p>
+        <label class="checkbox">
+          <input type="checkbox" id="consentCheck" />
+          我已阅读并同意参加本实验。
+        </label>
+        <div class="actions">
+          <button id="btnConsent" class="primary">继续</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-pretest" class="screen">
+      <div class="card">
+        <h1>前测问卷</h1>
+        <p class="muted">请选择最符合你情况的选项。</p>
+        <div class="grid2">
+          <div>
+            <label>你使用生成式AI工具的频率</label>
+            <select data-pretest="ai_usage_frequency">
+              <option value="">请选择</option>
+              <option value="1">几乎不用</option>
+              <option value="2">偶尔使用</option>
+              <option value="3">每周使用</option>
+              <option value="4">几乎每天使用</option>
+              <option value="5">高频深度使用</option>
+            </select>
+          </div>
+          <div>
+            <label>你对AI产品的熟悉程度</label>
+            <select data-pretest="ai_familiarity">
+              <option value="">请选择</option>
+              <option value="1">非常不熟悉</option>
+              <option value="2">不太熟悉</option>
+              <option value="3">一般</option>
+              <option value="4">比较熟悉</option>
+              <option value="5">非常熟悉</option>
+            </select>
+          </div>
+          <div>
+            <label>你对本任务场景的兴趣</label>
+            <select data-pretest="task_interest">
+              <option value="">请选择</option>
+              <option value="1">非常低</option>
+              <option value="2">较低</option>
+              <option value="3">一般</option>
+              <option value="4">较高</option>
+              <option value="5">非常高</option>
+            </select>
+          </div>
+          <div>
+            <label>你是否愿意为高质量AI工具付费</label>
+            <select data-pretest="paying_willingness_prior">
+              <option value="">请选择</option>
+              <option value="1">完全不愿意</option>
+              <option value="2">不太愿意</option>
+              <option value="3">不确定</option>
+              <option value="4">比较愿意</option>
+              <option value="5">非常愿意</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="btnPretest" class="primary">开始任务</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-task" class="screen">
+      <div class="task-layout">
+        <div class="task-main">
+          <div class="card sticky-note">
+            <h1>实验任务</h1>
+            <p>请你评估下面这款“AI研究助手”是否值得长期使用。你需要阅读页面信息，并与右侧AI助手互动，最后完成选择、回忆题和评价。</p>
+            <p class="muted">请自然操作，不需要刻意点击所有区域。</p>
+          </div>
+
+          <section class="aoi card" data-aoi="product_overview">
+            <h2>产品概览</h2>
+            <p>AI研究助手可以帮助用户完成文献梳理、摘要改写、研究方案构思、图表说明和学术写作建议。系统强调“快速生成、可交互修改、支持多轮对话”。</p>
+          </section>
+
+          <section class="aoi card" data-aoi="performance">
+            <h2>功能与性能</h2>
+            <ul>
+              <li>可根据用户目标生成研究思路、变量框架和方法建议。</li>
+              <li>可对文本进行摘要、润色、翻译和逻辑重组。</li>
+              <li>可根据用户追问不断调整输出结果。</li>
+            </ul>
+          </section>
+
+          <section class="aoi card" data-aoi="ease_of_use">
+            <h2>易用性与操作方式</h2>
+            <p>用户只需输入自然语言问题，无需复杂设置。系统支持一键复制、重新生成和多轮追问。</p>
+          </section>
+
+          <section class="aoi card" data-aoi="social_proof">
+            <h2>用户评价与口碑</h2>
+            <p>部分用户认为该工具能够显著提高写作效率，也有用户认为它需要人工判断和二次修改。</p>
+          </section>
+
+          <section class="aoi card" data-aoi="support_conditions">
+            <h2>支持条件与限制</h2>
+            <p>系统需要稳定网络连接。模型可能出现事实性错误、引用不完整或理解偏差，因此重要内容需要人工核验。</p>
+          </section>
+
+          <section class="aoi card" data-aoi="hedonic">
+            <h2>探索体验</h2>
+            <p>系统可以生成不同风格的研究构思，帮助用户发现新角度。部分用户会把它作为头脑风暴伙伴。</p>
+          </section>
+
+          <section class="aoi card" data-aoi="price_value">
+            <h2>价格与版本</h2>
+            <p>免费版每天有次数限制；专业版提供更长上下文、更快响应和更多高级功能。假设专业版价格为每月68元。</p>
+          </section>
+
+          <section class="aoi card" data-aoi="routine_use">
+            <h2>长期使用场景</h2>
+            <p>该工具可嵌入日常学习和科研流程，例如每天整理文献、修改论文段落、准备汇报材料。</p>
+          </section>
+
+          <section class="card choice-box">
+            <h2>阶段性选择</h2>
+            <p>阅读并与AI互动后，请先做一个初步选择。</p>
+            <div class="choice-row">
+              <button class="choice" data-choice="continue_use">愿意继续使用</button>
+              <button class="choice" data-choice="try_free">只愿意试用免费版</button>
+              <button class="choice" data-choice="not_use">暂不使用</button>
+            </div>
+          </section>
+        </div>
+
+        <aside class="chat-panel card">
+          <h2>AI助手窗口</h2>
+          <p class="muted">你可以询问该AI产品的使用价值、限制、适合场景或让它帮助你完成一个小任务。</p>
+          <div id="chatMessages" class="chat-messages"></div>
+          <div class="chat-input-row">
+            <textarea id="chatInput" placeholder="请输入你想问AI助手的问题"></textarea>
+            <button id="btnSendChat" class="primary">发送</button>
+          </div>
+          <div class="chat-tools">
+            <button id="btnRegenerate" class="secondary">重新生成</button>
+            <button id="btnCopyLast" class="secondary">复制上一条回复</button>
+          </div>
+        </aside>
+      </div>
+
+      <div class="bottom-actions">
+        <button id="btnTaskDone" class="primary">我已完成体验，进入后测</button>
+      </div>
+    </section>
+
+    <section id="screen-cognitive" class="screen">
+      <div class="card">
+        <h1>认知回忆与识别</h1>
+        <label>1. 请写出你刚才最记得的3条信息或印象。</label>
+        <textarea data-cog="free_recall" placeholder="例如：价格、功能、限制、某个使用场景等"></textarea>
+
+        <label>2. 以下哪些信息你刚才看到过？</label>
+        <div class="checks" data-cog-group="recognition">
+          <label><input type="checkbox" value="monthly_price_68"> 专业版每月68元</label>
+          <label><input type="checkbox" value="manual_verification"> 重要内容需要人工核验</label>
+          <label><input type="checkbox" value="offline_mode"> 系统支持完全离线使用</label>
+          <label><input type="checkbox" value="daily_research_workflow"> 可嵌入日常科研流程</label>
+          <label><input type="checkbox" value="guaranteed_no_errors"> 系统保证不会出错</label>
+        </div>
+
+        <label>3. 哪些信息最影响你的判断？请按重要性填写3项。</label>
+        <input data-cog="importance_rank_1" placeholder="第一重要" />
+        <input data-cog="importance_rank_2" placeholder="第二重要" />
+        <input data-cog="importance_rank_3" placeholder="第三重要" />
+
+        <div class="actions">
+          <button id="btnCognitive" class="primary">继续</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-scales" class="screen">
+      <div class="card">
+        <h1>体验量表</h1>
+        <p class="muted">1 = 非常不同意，5 = 非常同意。</p>
+        <div id="scaleItems"></div>
+        <div class="actions">
+          <button id="btnScales" class="primary">继续</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-review" class="screen">
+      <div class="card">
+        <h1>开放评价</h1>
+        <p>请像在应用商店或产品评论区一样，写一段你对刚才AI产品体验的真实评价。</p>
+        <textarea id="openReview" class="big" placeholder="请写下你的真实评价。请勿填写个人敏感信息。"></textarea>
+        <div class="actions">
+          <button id="btnSubmitReview" class="primary">提交并完成实验</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-end" class="screen">
+      <div class="card narrow">
+        <h1>实验完成</h1>
+        <p>感谢你的参与。数据已提交。</p>
+        <p class="muted">你可以关闭本页面。</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
