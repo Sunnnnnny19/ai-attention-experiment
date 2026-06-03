@@ -19,7 +19,12 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "data"));
 const ALLOW_MOCK_AI = String(process.env.ALLOW_MOCK_AI || "true").toLowerCase() === "true";
+
+const LLM_PROVIDER = (process.env.LLM_PROVIDER || "deepseek").toLowerCase();
+const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const ACTIVE_MODEL = LLM_PROVIDER === "deepseek" ? DEEPSEEK_MODEL : OPENAI_MODEL;
 const ADMIN_EXPORT_KEY = process.env.ADMIN_EXPORT_KEY || "";
 
 const EXPERIMENT_SYSTEM_PROMPT =
@@ -46,9 +51,21 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+const llmClient =
+  LLM_PROVIDER === "deepseek"
+    ? (
+        process.env.DEEPSEEK_API_KEY
+          ? new OpenAI({
+              apiKey: process.env.DEEPSEEK_API_KEY,
+              baseURL: DEEPSEEK_BASE_URL
+            })
+          : null
+      )
+    : (
+        process.env.OPENAI_API_KEY
+          ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+          : null
+      );
 
 const supabase = USE_SUPABASE
   ? createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
@@ -207,7 +224,8 @@ app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     time: nowIso(),
-    model: OPENAI_MODEL,
+    provider: LLM_PROVIDER,
+    model: ACTIVE_MODEL,
     mock_ai: ALLOW_MOCK_AI,
     data_store: USE_SUPABASE ? "supabase" : "local_jsonl",
     supabase_connected: USE_SUPABASE,
@@ -338,11 +356,11 @@ app.post("/api/chat", requireSession, async (req, res) => {
     let usage = null;
     let raw_id = null;
 
-    if (ALLOW_MOCK_AI || !openai) {
+    if (ALLOW_MOCK_AI || !llmClient) {
       answer = createMockAnswer(messages);
       usage = { mock: true };
     } else {
-      const input = [
+      const chatMessages = [
         { role: "system", content: EXPERIMENT_SYSTEM_PROMPT },
         ...messages.map((m) => ({
           role: m.role === "assistant" ? "assistant" : "user",
@@ -350,14 +368,14 @@ app.post("/api/chat", requireSession, async (req, res) => {
         }))
       ];
 
-      const response = await openai.responses.create({
-        model: OPENAI_MODEL,
-        input,
+      const response = await llmClient.chat.completions.create({
+        model: ACTIVE_MODEL,
+        messages: chatMessages,
         temperature: 0.7,
-        max_output_tokens: 700
+        max_tokens: 700
       });
 
-      answer = response.output_text || "";
+      answer = response.choices?.[0]?.message?.content || "";
       usage = response.usage || null;
       raw_id = response.id || null;
     }
@@ -368,8 +386,8 @@ app.post("/api/chat", requireSession, async (req, res) => {
       participant_id,
       session_id,
       turn_id,
-      model_name: OPENAI_MODEL,
-      mock_ai: ALLOW_MOCK_AI || !openai,
+      model_name: ACTIVE_MODEL,
+      mock_ai: ALLOW_MOCK_AI || !llmClient,
       user_prompt: userPrompt,
       model_response: answer,
       latency_ms,
@@ -385,7 +403,7 @@ app.post("/api/chat", requireSession, async (req, res) => {
         participant_id,
         session_id,
         turn_id,
-        model_name: OPENAI_MODEL,
+        model_name: ACTIVE_MODEL,
         user_prompt: userPrompt,
         error: err?.message || String(err),
         client_payload
@@ -514,6 +532,7 @@ app.get("/api/export/:table", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`AI Attention Experiment MVP running at http://localhost:${PORT}`);
+  console.log(`LLM provider: ${LLM_PROVIDER}`);
   console.log(`Mock AI: ${ALLOW_MOCK_AI}`);
   console.log(`Data store: ${USE_SUPABASE ? "Supabase" : "Local JSONL"}`);
   if (!USE_SUPABASE) {
