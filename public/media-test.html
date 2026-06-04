@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>多模态音视频采集测试</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 920px;
+      margin: 24px auto;
+      padding: 0 16px 40px;
+      line-height: 1.7;
+      color: #222;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 18px;
+      margin: 16px 0;
+      background: #fff;
+    }
+    button {
+      padding: 10px 14px;
+      margin: 6px 8px 6px 0;
+      border-radius: 8px;
+      border: 1px solid #999;
+      background: #f7f7f7;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    video, audio {
+      width: 100%;
+      margin-top: 12px;
+      background: #111;
+      border-radius: 10px;
+    }
+    .muted { color: #666; font-size: 14px; }
+    .ok { color: #0a7a2f; }
+    .err { color: #b00020; }
+    code { background: #f5f5f5; padding: 2px 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>多模态音视频采集测试</h1>
+
+  <div class="card">
+    <h2>单独授权说明</h2>
+    <p>
+      本页面用于测试在线实验中的可选多模态数据采集。若你同意，系统将在测试期间调用你的摄像头和/或麦克风，
+      录制任务过程中的音频或视频片段，并将文件上传到研究者配置的云端存储空间。音视频数据仅用于研究中的注意力测量方法测试，
+      不会公开展示，也不会用于与研究无关的身份识别。
+    </p>
+    <p>
+      你可以拒绝授权音视频采集；拒绝不会影响你继续参加普通网页实验。录制开始前浏览器会再次弹出摄像头/麦克风授权提示。
+      你可以随时点击“停止并上传”结束录制。
+    </p>
+    <label>
+      <input id="consent" type="checkbox" />
+      我已阅读并同意参与本次可选音视频采集测试。
+    </label>
+  </div>
+
+  <div class="card">
+    <h2>录制控制</h2>
+    <p class="muted">
+      建议先测试 10–30 秒。视频文件较大，不建议一次录制太久。
+    </p>
+    <button id="initBtn">创建测试会话</button>
+    <button id="startVideoBtn" disabled>开始录制音频+视频</button>
+    <button id="startAudioBtn" disabled>开始仅录音频</button>
+    <button id="stopBtn" disabled>停止并上传</button>
+    <button id="resetBtn">重置</button>
+    <p id="status" class="muted">尚未开始。</p>
+    <video id="preview" autoplay muted playsinline></video>
+    <audio id="audioPreview" controls style="display:none;"></audio>
+  </div>
+
+  <div class="card">
+    <h2>当前测试信息</h2>
+    <p>participant_id: <code id="pid">未创建</code></p>
+    <p>session_id: <code id="sid">未创建</code></p>
+    <p>上传结果: <span id="result" class="muted">暂无</span></p>
+  </div>
+
+<script>
+let participantId = "";
+let sessionId = "";
+let mediaRecorder = null;
+let mediaStream = null;
+let chunks = [];
+let startedAt = null;
+let currentMediaType = "";
+
+const consent = document.getElementById("consent");
+const initBtn = document.getElementById("initBtn");
+const startVideoBtn = document.getElementById("startVideoBtn");
+const startAudioBtn = document.getElementById("startAudioBtn");
+const stopBtn = document.getElementById("stopBtn");
+const resetBtn = document.getElementById("resetBtn");
+const statusEl = document.getElementById("status");
+const resultEl = document.getElementById("result");
+const pidEl = document.getElementById("pid");
+const sidEl = document.getElementById("sid");
+const preview = document.getElementById("preview");
+const audioPreview = document.getElementById("audioPreview");
+
+function setStatus(text, cls="muted") {
+  statusEl.className = cls;
+  statusEl.textContent = text;
+}
+
+function setResult(text, cls="muted") {
+  resultEl.className = cls;
+  resultEl.textContent = text;
+}
+
+async function createSession() {
+  if (!consent.checked) {
+    alert("请先勾选单独授权说明。");
+    return;
+  }
+  const resp = await fetch("/api/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      login_code: "MEDIA_TEST",
+      group_condition: "media_test",
+      client_meta: {
+        page: "media-test",
+        userAgent: navigator.userAgent
+      }
+    })
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.detail || data.error || "创建测试会话失败");
+
+  participantId = data.participant_id;
+  sessionId = data.session_id;
+  pidEl.textContent = participantId;
+  sidEl.textContent = sessionId;
+  startVideoBtn.disabled = false;
+  startAudioBtn.disabled = false;
+  setStatus("测试会话已创建，可以开始录制。", "ok");
+}
+
+function chooseMimeType(kind) {
+  const candidates = kind === "video"
+    ? ["video/webm;codecs=vp8,opus", "video/webm", "video/mp4"]
+    : ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+  return candidates.find(t => MediaRecorder.isTypeSupported(t)) || "";
+}
+
+async function startRecording(kind) {
+  if (!participantId || !sessionId) {
+    alert("请先创建测试会话。");
+    return;
+  }
+  if (!consent.checked) {
+    alert("请先勾选单独授权说明。");
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert("当前浏览器不支持摄像头/麦克风采集，或当前页面不是 HTTPS。");
+    return;
+  }
+
+  chunks = [];
+  currentMediaType = kind;
+  const constraints = kind === "video"
+    ? { audio: true, video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" } }
+    : { audio: true, video: false };
+
+  mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+  preview.srcObject = kind === "video" ? mediaStream : null;
+  preview.style.display = kind === "video" ? "block" : "none";
+  audioPreview.style.display = "none";
+
+  const mimeType = chooseMimeType(kind);
+  mediaRecorder = new MediaRecorder(mediaStream, mimeType ? { mimeType } : undefined);
+
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data && event.data.size > 0) chunks.push(event.data);
+  };
+
+  mediaRecorder.onstop = uploadRecording;
+  startedAt = new Date();
+
+  mediaRecorder.start(1000);
+
+  startVideoBtn.disabled = true;
+  startAudioBtn.disabled = true;
+  stopBtn.disabled = false;
+  initBtn.disabled = true;
+
+  setStatus(kind === "video" ? "正在录制音频+视频……" : "正在录制音频……", "ok");
+  setResult("录制中，尚未上传。", "muted");
+}
+
+async function uploadRecording() {
+  const endedAt = new Date();
+  const mimeType = mediaRecorder.mimeType || (currentMediaType === "video" ? "video/webm" : "audio/webm");
+  const blob = new Blob(chunks, { type: mimeType });
+  const durationMs = endedAt - startedAt;
+
+  if (currentMediaType === "video") {
+    preview.srcObject = null;
+    preview.src = URL.createObjectURL(blob);
+    preview.controls = true;
+  } else {
+    audioPreview.src = URL.createObjectURL(blob);
+    audioPreview.style.display = "block";
+  }
+
+  const fd = new FormData();
+  fd.append("participant_id", participantId);
+  fd.append("session_id", sessionId);
+  fd.append("media_type", currentMediaType);
+  fd.append("recording_stage", "media_test");
+  fd.append("duration_ms", String(durationMs));
+  fd.append("started_at", startedAt.toISOString());
+  fd.append("ended_at", endedAt.toISOString());
+  fd.append("media", blob, currentMediaType === "video" ? "recording.webm" : "recording_audio.webm");
+
+  setStatus("正在上传，请不要关闭页面……", "muted");
+
+  const resp = await fetch("/api/media/upload", {
+    method: "POST",
+    body: fd
+  });
+  const data = await resp.json();
+
+  if (!resp.ok) {
+    setStatus("上传失败。", "err");
+    setResult(data.detail || data.error || "未知错误", "err");
+    return;
+  }
+
+  setStatus("上传成功。", "ok");
+  setResult(`${data.storage_bucket}/${data.storage_path}，大小 ${data.file_size_bytes} bytes，时长 ${data.duration_ms} ms`, "ok");
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop());
+  }
+  stopBtn.disabled = true;
+  startVideoBtn.disabled = false;
+  startAudioBtn.disabled = false;
+  initBtn.disabled = false;
+}
+
+function resetPage() {
+  if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
+  participantId = "";
+  sessionId = "";
+  mediaRecorder = null;
+  mediaStream = null;
+  chunks = [];
+  startedAt = null;
+  currentMediaType = "";
+  pidEl.textContent = "未创建";
+  sidEl.textContent = "未创建";
+  preview.srcObject = null;
+  preview.removeAttribute("src");
+  preview.controls = false;
+  audioPreview.removeAttribute("src");
+  audioPreview.style.display = "none";
+  startVideoBtn.disabled = true;
+  startAudioBtn.disabled = true;
+  stopBtn.disabled = true;
+  initBtn.disabled = false;
+  setStatus("已重置。", "muted");
+  setResult("暂无", "muted");
+}
+
+initBtn.addEventListener("click", () => createSession().catch(err => {
+  setStatus("创建会话失败。", "err");
+  setResult(err.message, "err");
+}));
+
+startVideoBtn.addEventListener("click", () => startRecording("video").catch(err => {
+  setStatus("录制启动失败。", "err");
+  setResult(err.message, "err");
+}));
+
+startAudioBtn.addEventListener("click", () => startRecording("audio").catch(err => {
+  setStatus("录制启动失败。", "err");
+  setResult(err.message, "err");
+}));
+
+stopBtn.addEventListener("click", stopRecording);
+resetBtn.addEventListener("click", resetPage);
+</script>
+</body>
+</html>

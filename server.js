@@ -10,6 +10,7 @@ import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+import multer from "multer";
 
 dotenv.config();
 
@@ -79,8 +80,34 @@ const TABLES = {
   events: "events.jsonl",
   chats: "chats.jsonl",
   surveys: "surveys.jsonl",
-  reviews: "reviews.jsonl"
+  reviews: "reviews.jsonl",
+  media_records: "media_records.jsonl"
 };
+
+
+const MEDIA_BUCKET = process.env.MEDIA_BUCKET || "media-recordings";
+const MEDIA_MAX_UPLOAD_MB = Number(process.env.MEDIA_MAX_UPLOAD_MB || 80);
+
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: MEDIA_MAX_UPLOAD_MB * 1024 * 1024
+  }
+});
+
+function mediaExtFromMime(mime) {
+  const value = String(mime || "").toLowerCase();
+  if (value.includes("webm")) return "webm";
+  if (value.includes("mp4")) return "mp4";
+  if (value.includes("ogg")) return "ogg";
+  if (value.includes("mpeg")) return "mp3";
+  if (value.includes("wav")) return "wav";
+  return "bin";
+}
+
+function sanitizePathPart(value) {
+  return String(value || "unknown").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80);
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -499,6 +526,106 @@ app.post("/api/finish", requireSession, async (req, res) => {
     });
   }
 });
+
+app.post("/api/media/upload", mediaUpload.single("media"), async (req, res) => {
+  try {
+    const participant_id = req.body.participant_id;
+    const session_id = req.body.session_id;
+
+    if (!participant_id || !session_id) {
+      return res.status(400).json({
+        error: "participant_id and session_id are required"
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        error: "No media file uploaded. Use form field name: media"
+      });
+    }
+
+    const media_type = req.body.media_type || "unknown";
+    const recording_stage = req.body.recording_stage || "media_test";
+    const duration_ms = req.body.duration_ms ? Number(req.body.duration_ms) : null;
+    const started_at = req.body.started_at || null;
+    const ended_at = req.body.ended_at || null;
+
+    const ext = mediaExtFromMime(req.file.mimetype);
+    const pid = sanitizePathPart(participant_id);
+    const sid = sanitizePathPart(session_id);
+    const stage = sanitizePathPart(recording_stage);
+    const filename = `${Date.now()}_${sanitizePathPart(media_type)}.${ext}`;
+    const storage_path = `${pid}/${sid}/${stage}/${filename}`;
+
+    if (USE_SUPABASE) {
+      const { error: uploadError } = await supabase.storage
+        .from(MEDIA_BUCKET)
+        .upload(storage_path, req.file.buffer, {
+          contentType: req.file.mimetype,
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error("Supabase media upload error:", uploadError);
+        throw uploadError;
+      }
+    } else {
+      const mediaDir = path.join(DATA_DIR, "media", pid, sid, stage);
+      fs.mkdirSync(mediaDir, { recursive: true });
+      fs.writeFileSync(path.join(mediaDir, filename), req.file.buffer);
+    }
+
+    const record = {
+      participant_id,
+      session_id,
+      media_type,
+      recording_stage,
+      mime_type: req.file.mimetype,
+      storage_bucket: USE_SUPABASE ? MEDIA_BUCKET : "local",
+      storage_path,
+      file_size_bytes: req.file.size,
+      duration_ms,
+      started_at,
+      ended_at,
+      meta: {
+        original_name: req.file.originalname || null,
+        user_agent: req.headers["user-agent"] || "",
+        source: "media-test-page"
+      }
+    };
+
+    await insertRow("media_records", record);
+
+    await insertRow("events", {
+      participant_id,
+      session_id,
+      event_type: "media_upload",
+      event_target: recording_stage,
+      event_value: String(req.file.size),
+      payload: {
+        media_type,
+        mime_type: req.file.mimetype,
+        storage_bucket: record.storage_bucket,
+        storage_path,
+        duration_ms
+      }
+    });
+
+    res.json({
+      ok: true,
+      storage_bucket: record.storage_bucket,
+      storage_path,
+      file_size_bytes: req.file.size,
+      duration_ms
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Media upload failed",
+      detail: err?.message || String(err)
+    });
+  }
+});
+
 app.get("/api/export/:table", async (req, res) => {
   try {
     if (!ADMIN_EXPORT_KEY || req.query.key !== ADMIN_EXPORT_KEY) {
